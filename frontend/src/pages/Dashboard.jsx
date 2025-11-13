@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import moment from 'moment'
 import { Calendar, momentLocalizer } from 'react-big-calendar'
+import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop'
 import { Button } from '../components/ui/Button.jsx'
 import LoadingScreen from '../components/layout/LoadingScreen.jsx'
 import { Input } from '../components/ui/Input.jsx'
@@ -18,6 +19,14 @@ import {
 import { useAuth } from '../context/AuthContext.jsx'
 
 const localizer = momentLocalizer(moment)
+localizer.startAndEndAreDateOnly = () => false
+const DnDCalendar = withDragAndDrop(Calendar)
+
+const normalizeEventDate = (value) => {
+  if (!value) return new Date()
+  if (value instanceof Date) return value
+  return moment.utc(value).toDate()
+}
 
 const DashboardPage = () => {
   const { user } = useAuth()
@@ -47,6 +56,40 @@ const DashboardPage = () => {
     () => calendars.find((calendar) => calendar.id === selectedCalendarId) || calendars[0],
     [calendars, selectedCalendarId],
   )
+  const activeCalendarId = activeCalendar?.id
+
+  const transformEvents = useCallback(
+    (fetchedEvents = []) =>
+      fetchedEvents.map((event) => ({
+        ...event,
+        start: normalizeEventDate(event.start_datetime ?? event.start),
+        end: normalizeEventDate(event.end_datetime ?? event.end),
+      })),
+    [],
+  )
+
+  const refreshEvents = useCallback(async () => {
+    if (!activeCalendarId || !viewRange.start || !viewRange.end) return
+
+    const { events: fetchedEvents } = await fetchCalendarEvents(activeCalendarId, {
+      start_date: viewRange.start.toISOString(),
+      end_date: viewRange.end.toISOString(),
+    })
+
+    setEvents(transformEvents(fetchedEvents))
+  }, [activeCalendarId, transformEvents, viewRange.end, viewRange.start])
+
+  const persistEventTiming = useCallback(
+    async (eventId, startDate, endDate) => {
+      if (!eventId) return
+      await updateEvent(eventId, {
+        start_datetime: moment(startDate).toISOString(),
+        end_datetime: moment(endDate).toISOString(),
+      })
+      await refreshEvents()
+    },
+    [refreshEvents],
+  )
 
   useEffect(() => {
     const loadCalendars = async () => {
@@ -68,28 +111,8 @@ const DashboardPage = () => {
   }, [])
 
   useEffect(() => {
-    if (!activeCalendar || !viewRange.start || !viewRange.end) return
-
-    const loadEvents = async () => {
-      try {
-        const { events: fetchedEvents } = await fetchCalendarEvents(activeCalendar.id, {
-          start_date: viewRange.start.toISOString(),
-          end_date: viewRange.end.toISOString(),
-        })
-
-        const transformed = fetchedEvents.map((event) => ({
-          ...event,
-          start: new Date(event.start_datetime || event.start),
-          end: new Date(event.end_datetime || event.end),
-        }))
-        setEvents(transformed)
-      } catch (err) {
-        setError(err.message || 'Failed to load events')
-      }
-    }
-
-    loadEvents()
-  }, [activeCalendar, viewRange])
+    refreshEvents().catch((err) => setError(err.message || 'Failed to load events'))
+  }, [refreshEvents])
 
   const handleRangeChange = (range) => {
     const start = Array.isArray(range) ? range[0] : range.start
@@ -106,6 +129,8 @@ const DashboardPage = () => {
     const { name, value } = event.target
     setEventForm((prev) => ({ ...prev, [name]: value }))
   }
+
+  const alwaysTimed = useCallback(() => false, [])
 
   const handleCreateCalendar = () => {
     setCalendarForm({ id: null, name: '', color: '#3788d8', description: '' })
@@ -170,8 +195,8 @@ const DashboardPage = () => {
     setEventForm({
       id: null,
       title: '',
-      start: slotInfo.start,
-      end: slotInfo.end,
+      start: normalizeEventDate(slotInfo.start),
+      end: normalizeEventDate(slotInfo.end),
       description: '',
     })
     setEventModalOpen(true)
@@ -181,8 +206,8 @@ const DashboardPage = () => {
     setEventForm({
       id: event.id,
       title: event.title,
-      start: new Date(event.start),
-      end: new Date(event.end),
+      start: normalizeEventDate(event.start),
+      end: normalizeEventDate(event.end),
       description: event.description || '',
     })
     setEventModalOpen(true)
@@ -195,12 +220,13 @@ const DashboardPage = () => {
       return
     }
 
+    setError(null)
     try {
       const payload = {
-        calendar_id: activeCalendar.id,
+        calendar_id: activeCalendarId,
         title: eventForm.title,
-        start_datetime: eventForm.start,
-        end_datetime: eventForm.end,
+        start_datetime: moment(eventForm.start).toISOString(),
+        end_datetime: moment(eventForm.end).toISOString(),
         description: eventForm.description,
       }
 
@@ -211,17 +237,7 @@ const DashboardPage = () => {
       }
 
       setEventModalOpen(false)
-      const { events: refreshedEvents } = await fetchCalendarEvents(activeCalendar.id, {
-        start_date: viewRange.start.toISOString(),
-        end_date: viewRange.end.toISOString(),
-      })
-      setEvents(
-        refreshedEvents.map((evt) => ({
-          ...evt,
-          start: new Date(evt.start_datetime || evt.start),
-          end: new Date(evt.end_datetime || evt.end),
-        })),
-      )
+      await refreshEvents()
     } catch (err) {
       setError(err.message || 'Failed to save event')
     }
@@ -229,22 +245,33 @@ const DashboardPage = () => {
 
   const handleDeleteEvent = async () => {
     if (!eventForm.id) return
+    setError(null)
     try {
       await deleteEvent(eventForm.id)
       setEventModalOpen(false)
-      const { events: refreshedEvents } = await fetchCalendarEvents(activeCalendar.id, {
-        start_date: viewRange.start.toISOString(),
-        end_date: viewRange.end.toISOString(),
-      })
-      setEvents(
-        refreshedEvents.map((evt) => ({
-          ...evt,
-          start: new Date(evt.start_datetime || evt.start),
-          end: new Date(evt.end_datetime || evt.end),
-        })),
-      )
+      await refreshEvents()
     } catch (err) {
       setError(err.message || 'Failed to delete event')
+    }
+  }
+
+  const handleEventDrop = async ({ event: droppedEvent, start, end }) => {
+    if (!droppedEvent?.id) return
+    setError(null)
+    try {
+      await persistEventTiming(droppedEvent.id, start, end)
+    } catch (err) {
+      setError(err.message || 'Failed to move event')
+    }
+  }
+
+  const handleEventResize = async ({ event: resizedEvent, start, end }) => {
+    if (!resizedEvent?.id) return
+    setError(null)
+    try {
+      await persistEventTiming(resizedEvent.id, start, end)
+    } catch (err) {
+      setError(err.message || 'Failed to resize event')
     }
   }
 
@@ -253,7 +280,7 @@ const DashboardPage = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex min-h-0 w-full flex-1 flex-col gap-6 overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Hello, {user?.name || 'there'}</h1>
@@ -271,12 +298,12 @@ const DashboardPage = () => {
 
       {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
-      <div className="flex flex-col gap-6 lg:flex-row">
-        <aside className="w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:w-72">
+      <div className="flex min-h-0 flex-1 flex-col gap-6 lg:flex-row">
+        <aside className="flex w-full flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:w-80 lg:flex-shrink-0">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-slate-700">Your calendars</h2>
           </div>
-          <ul className="space-y-2">
+          <ul className="flex-1 space-y-2 overflow-auto pr-1">
             {calendars.map((calendar) => {
               const isActive = activeCalendar?.id === calendar.id
               return (
@@ -311,19 +338,26 @@ const DashboardPage = () => {
           </ul>
         </aside>
 
-        <section className="flex-1 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white p-4 shadow-sm" style={{height: 0, minHeight: `100%`}}>
           {activeCalendar ? (
-            <Calendar
-              localizer={localizer}
-              events={events}
-              startAccessor="start"
-              endAccessor="end"
-              style={{ height: 600 }}
-              selectable
-              onSelectSlot={openEventModal}
-              onSelectEvent={handleSelectEvent}
-              onRangeChange={handleRangeChange}
-            />
+            <div className="calendar-shell flex-1 min-h-0">
+              <DnDCalendar
+                localizer={localizer}
+                events={events}
+                startAccessor="start"
+                endAccessor="end"
+                allDayAccessor={alwaysTimed}
+                style={{ height: '100%' }}
+                selectable
+                resizable
+                showMultiDayTimes
+                onSelectSlot={openEventModal}
+                onSelectEvent={handleSelectEvent}
+                onRangeChange={handleRangeChange}
+                onEventDrop={handleEventDrop}
+                onEventResize={handleEventResize}
+              />
+            </div>
           ) : (
             <div className="flex h-64 flex-col items-center justify-center text-center text-slate-500">
               <p className="text-base font-medium">No calendars yet</p>

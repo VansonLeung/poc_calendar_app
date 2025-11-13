@@ -12,14 +12,14 @@ const AppLayout = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <header className="border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div>
+    <div className="flex min-h-screen flex-col bg-slate-100">
+      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
+        <div className="flex w-full flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+          <div className="min-w-[200px]">
             <p className="text-xl font-semibold text-slate-900">Calendar Workspace</p>
             <p className="text-sm text-slate-500">Plan, organize, and keep everyone aligned</p>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-1 flex-wrap items-center justify-end gap-4">
             <div className="text-right">
               <p className="text-sm font-medium text-slate-900">{user?.name || 'User'}</p>
               <p className="text-xs text-slate-500">{user?.email}</p>
@@ -30,8 +30,12 @@ const AppLayout = () => {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-6 py-8">
-        <Outlet />
+      <main className="flex flex-1 flex-col bg-slate-100">
+        <div className="flex flex-1 px-4 py-6 sm:px-6 lg:px-8">
+          <div className="flex min-h-0 w-full flex-1">
+            <Outlet />
+          </div>
+        </div>
       </main>
     </div>
   )

@@ -7,6 +7,7 @@ import RegisterPage from './pages/Register.jsx'
 import DashboardPage from './pages/Dashboard.jsx'
 import { useAuth } from './context/AuthContext.jsx'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
+import 'react-big-calendar/lib/addons/dragAndDrop/styles.css'
 
 function App() {
   const { isAuthenticated } = useAuth()
