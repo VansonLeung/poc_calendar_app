@@ -3,13 +3,27 @@ import User from './User.js'
 import Calendar from './Calendar.js'
 import Event from './Event.js'
 import Permission from './Permission.js'
+import EventParticipant from './EventParticipant.js'
+import ParticipationRequest from './ParticipationRequest.js'
+import LeaveRequest from './LeaveRequest.js'
+import LeaveRequestEvent from './LeaveRequestEvent.js'
+import Holiday from './Holiday.js'
+import SubstituteRequest from './SubstituteRequest.js'
+import ReferenceValue from './ReferenceValue.js'
 
 // Initialize models
 const models = {
   User,
   Calendar,
   Event,
-  Permission
+  Permission,
+  EventParticipant,
+  ParticipationRequest,
+  LeaveRequest,
+  LeaveRequestEvent,
+  Holiday,
+  SubstituteRequest,
+  ReferenceValue
 }
 
 // Initialize each model
@@ -27,7 +41,19 @@ Object.values(models).forEach(model => {
 })
 
 // Export all models
-export { User, Calendar, Event, Permission }
+export {
+  User,
+  Calendar,
+  Event,
+  Permission,
+  EventParticipant,
+  ParticipationRequest,
+  LeaveRequest,
+  LeaveRequestEvent,
+  Holiday,
+  SubstituteRequest,
+  ReferenceValue
+}
 
 // Export sequelize instance
 export { sequelize }

@@ -2,6 +2,10 @@ import express from 'express'
 import authRoutes from './auth.js'
 import calendarRoutes from './calendars.js'
 import eventRoutes from './events.js'
+import participationRoutes from './participation.js'
+import leaveRoutes from './leaves.js'
+import substituteRoutes from './substitutes.js'
+import referenceRoutes from './reference.js'
 
 const router = express.Router()
 
@@ -21,6 +25,10 @@ router.get('/health', (req, res) => {
 router.use('/auth', authRoutes)
 router.use('/calendars', calendarRoutes)
 router.use('/events', eventRoutes)
+router.use('/', participationRoutes)
+router.use('/', leaveRoutes)
+router.use('/', substituteRoutes)
+router.use('/reference-data', referenceRoutes)
 
 // 404 handler for API routes
 router.use('*', (req, res) => {

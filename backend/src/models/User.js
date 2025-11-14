@@ -47,6 +47,36 @@ class User extends Model {
         type: DataTypes.STRING,
         allowNull: false
       },
+      role: {
+        type: DataTypes.ENUM('teacher', 'admin'),
+        allowNull: false,
+        defaultValue: 'teacher'
+      },
+      employee_id: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        unique: true,
+        validate: {
+          len: [1, 50]
+        }
+      },
+      department: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        validate: {
+          len: [1, 100]
+        }
+      },
+      status: {
+        type: DataTypes.ENUM('active', 'on_leave', 'inactive'),
+        allowNull: false,
+        defaultValue: 'active'
+      },
+      metadata: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+        defaultValue: {}
+      },
       timezone: {
         type: DataTypes.STRING,
         defaultValue: 'UTC',
@@ -65,6 +95,16 @@ class User extends Model {
         {
           unique: true,
           fields: ['email']
+        },
+        {
+          unique: true,
+          fields: ['employee_id']
+        },
+        {
+          fields: ['role', 'department']
+        },
+        {
+          fields: ['status']
         }
       ]
     })
@@ -78,6 +118,38 @@ class User extends Model {
     this.hasMany(models.Permission, {
       foreignKey: 'user_id',
       as: 'permissions'
+    })
+    this.hasMany(models.Event, {
+      foreignKey: 'created_by',
+      as: 'created_events'
+    })
+    this.hasMany(models.EventParticipant, {
+      foreignKey: 'teacher_id',
+      as: 'participations'
+    })
+    this.hasMany(models.ParticipationRequest, {
+      foreignKey: 'requester_id',
+      as: 'participationRequests'
+    })
+    this.hasMany(models.ParticipationRequest, {
+      foreignKey: 'approver_id',
+      as: 'approvals'
+    })
+    this.hasMany(models.LeaveRequest, {
+      foreignKey: 'teacher_id',
+      as: 'leaveRequests'
+    })
+    this.hasMany(models.LeaveRequest, {
+      foreignKey: 'approver_id',
+      as: 'leaveApprovals'
+    })
+    this.hasMany(models.SubstituteRequest, {
+      foreignKey: 'requested_by',
+      as: 'substituteRequests'
+    })
+    this.hasMany(models.SubstituteRequest, {
+      foreignKey: 'assigned_teacher_id',
+      as: 'assignedSubstituteRoles'
     })
   }
 }

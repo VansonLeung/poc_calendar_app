@@ -1,5 +1,6 @@
 import express from 'express'
 import eventService from '../services/eventService.js'
+import participationService from '../services/participationService.js'
 import { authenticateToken } from '../middleware/auth.js'
 
 const router = express.Router()
@@ -13,10 +14,12 @@ router.get('/calendar/:calendarId', async (req, res) => {
     const { calendarId } = req.params
     const { start_date, end_date } = req.query
 
-    const events = await eventService.getCalendarEvents(calendarId, req.user.id, {
-      startDate: start_date,
-      endDate: end_date
-    })
+    const events = await eventService.getCalendarEvents(
+      calendarId,
+      req.user.id,
+      start_date,
+      end_date
+    )
 
     res.json({ events })
   } catch (error) {
@@ -33,10 +36,11 @@ router.get('/', async (req, res) => {
   try {
     const { start_date, end_date } = req.query
 
-    const events = await eventService.getUserEvents(req.user.id, {
-      startDate: start_date,
-      endDate: end_date
-    })
+    const events = await eventService.getUserEvents(
+      req.user.id,
+      start_date,
+      end_date
+    )
 
     res.json({ events })
   } catch (error) {
@@ -85,6 +89,67 @@ router.post('/', async (req, res) => {
     const status = error.message === 'Calendar not found' || error.message === 'Access denied' ? 404 : 400
     res.status(status).json({
       error: error.message || 'Failed to create event'
+    })
+  }
+})
+
+// List event participants
+router.get('/:eventId/participants', async (req, res) => {
+  try {
+    const { eventId } = req.params
+    const participants = await participationService.getEventParticipants(eventId, req.user.id)
+    res.json({ participants })
+  } catch (error) {
+    console.error('List participants error:', error)
+    const status = error.message === 'Event not found' || error.message === 'Access denied' ? 404 : 400
+    res.status(status).json({
+      error: error.message || 'Failed to list participants'
+    })
+  }
+})
+
+// Invite participants (pending response)
+router.post('/:eventId/invite', async (req, res) => {
+  try {
+    const { eventId } = req.params
+    const participants = await participationService.upsertParticipants(
+      eventId,
+      req.user.id,
+      req.body,
+      'invite'
+    )
+    res.status(201).json({
+      message: 'Participants invited',
+      participants
+    })
+  } catch (error) {
+    console.error('Invite participants error:', error)
+    const status = error.message === 'Event not found' || error.message === 'Access denied' ? 404 : 400
+    res.status(status).json({
+      error: error.message || 'Failed to invite participants'
+    })
+  }
+})
+
+// Assign participants immediately
+router.post('/:eventId/assign', async (req, res) => {
+  try {
+    const { eventId } = req.params
+    const participants = await participationService.upsertParticipants(
+      eventId,
+      req.user.id,
+      req.body,
+      'assign'
+    )
+    res.status(201).json({
+      message: 'Participants assigned',
+      participants
+    })
+  } catch (error) {
+    console.error('Assign participants error:', error)
+    const status = error.message === 'Event not found' || error.message === 'Access denied' ? 404 : 400
+    res.status(status).json({
+      error: error.message || 'Failed to assign participants'
     })
   }
 })

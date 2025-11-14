@@ -5,7 +5,9 @@ import config from '../config/index.js'
 class AuthService {
   // Register a new user
   async register(userData) {
-    const { email, password, name, timezone = 'UTC' } = userData
+    const { email, password, name, timezone = 'UTC', role: requestedRole } = userData
+    const allowedRoles = ['teacher', 'admin']
+    const role = allowedRoles.includes(requestedRole) ? requestedRole : 'teacher'
 
     // Check if user already exists
     const existingUser = await User.findByEmail(email)
@@ -26,14 +28,16 @@ class AuthService {
       email: email.toLowerCase(),
       password_hash: passwordHash,
       name,
-      timezone
+      timezone,
+      role
     })
 
     // Generate token
     const token = generateToken({
       id: user.id,
       email: user.email,
-      name: user.name
+      name: user.name,
+      role: user.role
     })
 
     return {
@@ -62,7 +66,8 @@ class AuthService {
     const token = generateToken({
       id: user.id,
       email: user.email,
-      name: user.name
+      name: user.name,
+      role: user.role
     })
 
     return {

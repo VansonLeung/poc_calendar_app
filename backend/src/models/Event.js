@@ -113,6 +113,50 @@ class Event extends Model {
           len: [1, 200]
         }
       },
+      event_type: {
+        type: DataTypes.ENUM('lesson', 'meeting', 'duty', 'exam', 'activity'),
+        allowNull: false,
+        defaultValue: 'lesson'
+      },
+      status: {
+        type: DataTypes.ENUM('scheduled', 'cancelled', 'completed'),
+        allowNull: false,
+        defaultValue: 'scheduled'
+      },
+      created_by: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        references: {
+          model: 'users',
+          key: 'id'
+        }
+      },
+      requires_approval: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+      },
+      location: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        validate: {
+          len: [1, 150]
+        }
+      },
+      class_name: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        validate: {
+          len: [1, 150]
+        }
+      },
+      subject: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        validate: {
+          len: [1, 150]
+        }
+      },
       start_datetime: {
         type: DataTypes.DATE,
         allowNull: false
@@ -146,6 +190,24 @@ class Event extends Model {
             }
           }
         }
+      },
+      visibility_type: {
+        type: DataTypes.ENUM('public', 'private', 'whitelist', 'blacklist'),
+        allowNull: false,
+        defaultValue: 'public'
+      },
+      visibility_list: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+        defaultValue: {
+          allowed_users: [],
+          blocked_users: []
+        }
+      },
+      metadata: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+        defaultValue: {}
       }
     }, {
       sequelize,
@@ -163,6 +225,15 @@ class Event extends Model {
         },
         {
           fields: ['recurrence_rule']
+        },
+        {
+          fields: ['created_by']
+        },
+        {
+          fields: ['event_type']
+        },
+        {
+          fields: ['status']
         }
       ]
     })
@@ -172,6 +243,26 @@ class Event extends Model {
     this.belongsTo(models.Calendar, {
       foreignKey: 'calendar_id',
       as: 'calendar'
+    })
+    this.belongsTo(models.User, {
+      foreignKey: 'created_by',
+      as: 'creator'
+    })
+    this.hasMany(models.EventParticipant, {
+      foreignKey: 'event_id',
+      as: 'participants'
+    })
+    this.hasMany(models.ParticipationRequest, {
+      foreignKey: 'event_id',
+      as: 'participationRequests'
+    })
+    this.hasMany(models.LeaveRequestEvent, {
+      foreignKey: 'event_id',
+      as: 'leaveImpacts'
+    })
+    this.hasMany(models.SubstituteRequest, {
+      foreignKey: 'event_id',
+      as: 'substituteRequests'
     })
   }
 }

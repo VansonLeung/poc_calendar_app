@@ -1,13 +1,30 @@
 import { Op } from 'sequelize'
 import Event from '../models/Event.js'
 import Calendar from '../models/Calendar.js'
+import EventParticipant from '../models/EventParticipant.js'
 import { withTransaction } from '../utils/transactions.js'
 
 class EventService {
   // Create a new event
   async createEvent(userId, eventData) {
     return await withTransaction(async (transaction) => {
-      const { calendar_id, title, start_datetime, end_datetime, description, recurrence_rule } = eventData
+      const {
+        calendar_id,
+        title,
+        start_datetime,
+        end_datetime,
+        description,
+        recurrence_rule,
+        event_type = 'lesson',
+        status = 'scheduled',
+        requires_approval = false,
+        location,
+        class_name,
+        subject,
+        visibility_type = 'public',
+        visibility_list,
+        metadata
+      } = eventData
 
       // Check if calendar exists and user has edit permission
       const calendar = await Calendar.findByPk(calendar_id, { transaction })
@@ -33,8 +50,34 @@ class EventService {
         start_datetime: startDate,
         end_datetime: endDate,
         description,
-        recurrence_rule
+        recurrence_rule,
+        event_type,
+        status,
+        created_by: userId,
+        requires_approval,
+        location,
+        class_name,
+        subject,
+        visibility_type,
+        visibility_list,
+        metadata
       }, { transaction })
+
+      await EventParticipant.findOrCreate({
+        where: {
+          event_id: event.id,
+          teacher_id: userId
+        },
+        defaults: {
+          participation_role: 'primary',
+          invitation_method: 'assign',
+          status: 'accepted',
+          requires_approval: false,
+          assigned_by: userId,
+          assigned_at: new Date()
+        },
+        transaction
+      })
 
       return event
     })
@@ -116,11 +159,35 @@ class EventService {
         throw new Error('Permission denied')
       }
 
-      const { title, start_datetime, end_datetime, description, recurrence_rule } = updateData
+      const {
+        title,
+        start_datetime,
+        end_datetime,
+        description,
+        recurrence_rule,
+        status,
+        event_type,
+        requires_approval,
+        location,
+        class_name,
+        subject,
+        visibility_type,
+        visibility_list,
+        metadata
+      } = updateData
 
       if (title) event.title = title
       if (description !== undefined) event.description = description
       if (recurrence_rule !== undefined) event.recurrence_rule = recurrence_rule
+      if (status) event.status = status
+      if (event_type) event.event_type = event_type
+      if (requires_approval !== undefined) event.requires_approval = requires_approval
+      if (location !== undefined) event.location = location
+      if (class_name !== undefined) event.class_name = class_name
+      if (subject !== undefined) event.subject = subject
+      if (visibility_type) event.visibility_type = visibility_type
+      if (visibility_list !== undefined) event.visibility_list = visibility_list
+      if (metadata !== undefined) event.metadata = metadata
 
       // Validate and update dates
       if (start_datetime || end_datetime) {
@@ -163,7 +230,16 @@ class EventService {
   }
 
   // Check for conflicting events
-  async checkConflicts(calendarId, startDate, endDate, excludeEventId = null) {
+  async checkConflicts(calendarId, userId, startDate, endDate, excludeEventId = null) {
+    const calendar = await Calendar.findByPk(calendarId)
+    if (!calendar) {
+      throw new Error('Calendar not found')
+    }
+
+    if (!(await calendar.hasPermission(userId, 'edit'))) {
+      throw new Error('Access denied')
+    }
+
     const conflictingEvents = await Event.findOverlapping(
       calendarId,
       new Date(startDate),
